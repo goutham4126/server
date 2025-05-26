@@ -61,7 +61,7 @@ class SymptomsRequest(BaseModel):
 
 # Load the ensemble model pickle file
 try:
-    with open('symptom_classifier_ensemble.pkl', 'rb') as f:
+    with open('symptom_ensemble.pkl', 'rb') as f:
         classifier = pickle.load(f)
 except Exception as e:
     print(f"Error loading model: {e}")
