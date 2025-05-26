@@ -13,6 +13,24 @@ import warnings
 # Suppress warnings
 warnings.filterwarnings('ignore')
 
+
+class SymptomClassifier:
+    def __init__(self, model, vectorizer, label_encoder):
+        self.model = model
+        self.vectorizer = vectorizer
+        self.label_encoder = label_encoder
+        self.stemmer = SnowballStemmer('english')
+    
+    def preprocess_text(self, text):
+        # Remove special chars, keep commas for symptom separation
+        text = re.sub(r'[^a-zA-Z,\s]', '', text)
+        # Replace commas with spaces (for inputs like "headache,fever")
+        text = text.replace(',', ' ')
+        # Tokenize and stem
+        tokens = word_tokenize(text.lower())
+        tokens = [self.stemmer.stem(token) for token in tokens if token.isalpha()]
+        return ' '.join(tokens)
+
 # Function to download NLTK resources with error handling
 def download_nltk_resources():
     try:
@@ -27,20 +45,6 @@ def download_nltk_resources():
 
 # Download required NLTK data
 download_nltk_resources()
-
-# Initialize stemmer
-stemmer = SnowballStemmer('english')
-
-# Improved preprocessing function
-def preprocess_text(text):
-    # Remove special chars, keep commas for symptom separation
-    text = re.sub(r'[^a-zA-Z,\s]', '', text)  
-    # Replace commas with spaces (for inputs like "headache,fever")
-    text = text.replace(',', ' ')  
-    # Tokenize and stem
-    tokens = word_tokenize(text.lower())
-    tokens = [stemmer.stem(token) for token in tokens if token.isalpha()]
-    return ' '.join(tokens)
 
 # Initialize FastAPI app
 app = FastAPI()
@@ -58,10 +62,7 @@ class SymptomsRequest(BaseModel):
 # Load the ensemble model pickle file
 try:
     with open('symptom_classifier_ensemble.pkl', 'rb') as f:
-        model_data = pickle.load(f)
-        model = model_data['model']
-        vectorizer = model_data['vectorizer']
-        label_encoder = model_data['label_encoder']
+        classifier = pickle.load(f)
 except Exception as e:
     print(f"Error loading model: {e}")
     raise
@@ -70,16 +71,16 @@ except Exception as e:
 async def predict(request: SymptomsRequest):
     try:
         # Preprocess the input symptoms
-        processed_text = preprocess_text(request.symptoms)
+        processed_text = classifier.preprocess_text(request.symptoms)
         
         # Vectorize the processed text
-        features = vectorizer.transform([processed_text])
+        features = classifier.vectorizer.transform([processed_text])
         
         # Get prediction probabilities
-        probs = model.predict_proba(features)[0]
+        probs = classifier.model.predict_proba(features)[0]
         
         # Get the class names from label encoder
-        classes = label_encoder.classes_
+        classes = classifier.label_encoder.classes_
         
         # Get top 3 predictions with confidence scores
         results = sorted(zip(classes, probs), key=lambda x: x[1], reverse=True)[:3]
